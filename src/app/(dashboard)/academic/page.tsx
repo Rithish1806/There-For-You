@@ -18,7 +18,17 @@ import {
   Trash2,
   HelpCircle,
   RotateCcw,
-  Award
+  Award,
+  Copy,
+  Download,
+  Clock,
+  BookMarked,
+  Layers,
+  Eye,
+  EyeOff,
+  FileCheck,
+  RefreshCw,
+  X
 } from 'lucide-react';
 
 interface SubjectItem {
@@ -78,6 +88,20 @@ export default function AcademicPage() {
     { id: 2, title: 'Revise Normalization (DBMS)', time: '25 min', priority: 'Medium', completed: false },
     { id: 3, title: 'Submit OS Lab Record Experiment 8', time: '45 min', priority: 'High', completed: true },
   ]);
+
+  // PDF Summarizer state
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfPastedText, setPdfPastedText] = useState('');
+  const [pdfInputMode, setPdfInputMode] = useState<'upload' | 'paste'>('upload');
+  const [pdfFocusMode, setPdfFocusMode] = useState<'comprehensive' | 'formulas' | 'cheatsheet' | 'flashcards'>('comprehensive');
+  const [pdfSubject, setPdfSubject] = useState('');
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [summarizeStep, setSummarizeStep] = useState(1);
+  const [summaryResult, setSummaryResult] = useState<any>(null);
+  const [pdfError, setPdfError] = useState<string | null>(null);
+  const [activeResultTab, setActiveResultTab] = useState<'notes' | 'formulas' | 'flashcards' | 'exam'>('notes');
+  const [revealedFlashcards, setRevealedFlashcards] = useState<Record<number, boolean>>({});
+  const [copiedSummary, setCopiedSummary] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -230,6 +254,84 @@ export default function AcademicPage() {
     return quizQuestions.reduce((score, q) => {
       return userAnswers[q.id] === q.answerIndex ? score + 1 : score;
     }, 0);
+  };
+
+  const handleSummarizePdf = async () => {
+    setPdfError(null);
+    if (pdfInputMode === 'upload' && !pdfFile) {
+      setPdfError('Please select or drag a PDF/Text lecture or lab file to summarize.');
+      return;
+    }
+    if (pdfInputMode === 'paste' && (!pdfPastedText.trim() || pdfPastedText.trim().length < 50)) {
+      setPdfError('Please paste at least 50 characters of study or lab manual content.');
+      return;
+    }
+
+    setIsSummarizing(true);
+    setSummarizeStep(1);
+
+    const stepTimer = setInterval(() => {
+      setSummarizeStep(prev => (prev < 4 ? prev + 1 : prev));
+    }, 1300);
+
+    try {
+      let res: Response;
+      const targetSub = pdfSubject || (subjects[0]?.name || 'Academic Course');
+
+      if (pdfInputMode === 'upload' && pdfFile) {
+        const formData = new FormData();
+        formData.append('file', pdfFile);
+        formData.append('focusMode', pdfFocusMode);
+        formData.append('subject', targetSub);
+
+        res = await fetch('/api/academic/summarize-pdf', {
+          method: 'POST',
+          body: formData
+        });
+      } else {
+        res = await fetch('/api/academic/summarize-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            documentText: pdfPastedText,
+            focusMode: pdfFocusMode,
+            subject: targetSub
+          })
+        });
+      }
+
+      clearInterval(stepTimer);
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Failed to summarize document.');
+      }
+
+      const json = await res.json();
+      setSummaryResult(json.data);
+      setActiveResultTab('notes');
+      setRevealedFlashcards({});
+    } catch (err: any) {
+      clearInterval(stepTimer);
+      setPdfError(err.message || 'An error occurred while generating the summary.');
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
+  const toggleFlashcard = (idx: number) => {
+    setRevealedFlashcards(prev => ({
+      ...prev,
+      [idx]: !prev[idx]
+    }));
+  };
+
+  const handleCopySummary = () => {
+    if (!summaryResult) return;
+    const textToCopy = `# ${summaryResult.title}\n\n## Overview\n${summaryResult.overview}\n\n## Key Takeaways\n${summaryResult.keyTakeaways?.map((t: string) => `- ${t}`).join('\n')}\n\n## Core Sections\n${summaryResult.sections?.map((s: any) => `### ${s.heading}\n${s.summary}\n${s.bulletPoints?.map((b: string) => `* ${b}`).join('\n')}`).join('\n\n')}`;
+    navigator.clipboard.writeText(textToCopy);
+    setCopiedSummary(true);
+    setTimeout(() => setCopiedSummary(false), 2000);
   };
 
   if (isLoading) {
@@ -854,23 +956,457 @@ export default function AcademicPage() {
             </div>
           )}
 
-          {/* TAB 5: Materials */}
+          {/* TAB 5: Materials / PDF Summarizer */}
           {activeTab === 'materials' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 space-y-6">
-              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <FileText className="text-indigo-600" />
-                Smart Lecture & Lab PDF Summarizer
-              </h2>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 space-y-8 animate-in fade-in duration-300">
               
-              <div className="border-2 border-dashed border-slate-300 rounded-2xl p-12 text-center hover:border-indigo-500 hover:bg-indigo-50/50 transition-all cursor-pointer group">
-                <div className="w-16 h-16 bg-slate-100 text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 transition-colors">
-                  <Upload size={32} />
+              {/* Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold mb-2">
+                    <Sparkles size={14} /> Powered by Groq AI API
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                    <FileText className="text-indigo-600" />
+                    Smart Lecture & Lab PDF Summarizer
+                  </h2>
+                  <p className="text-slate-500 text-sm mt-1">
+                    Upload textbooks, lecture slides, or lab manuals to extract structured revision notes, formulas, and interactive flashcards.
+                  </p>
                 </div>
-                <h3 className="font-bold text-slate-900 text-base mb-1">Upload Lecture or Lab Manual (PDF)</h3>
-                <p className="text-slate-500 text-xs max-w-sm mx-auto leading-relaxed">
-                  There For You will extract formulas, summarize procedures, and create revision flashcards automatically.
-                </p>
+
+                {summaryResult && (
+                  <button
+                    onClick={() => {
+                      setSummaryResult(null);
+                      setPdfFile(null);
+                      setPdfPastedText('');
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3.5 py-2 rounded-xl transition-colors cursor-pointer shrink-0"
+                  >
+                    <RefreshCw size={13} />
+                    Summarize Another Document
+                  </button>
+                )}
               </div>
+
+              {!summaryResult ? (
+                /* Document Input Controls */
+                <div className="max-w-2xl mx-auto space-y-6">
+                  
+                  {/* Focus Mode & Subject */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Related Subject
+                      </label>
+                      <select
+                        value={pdfSubject || (subjects[0]?.name || '')}
+                        onChange={(e) => setPdfSubject(e.target.value)}
+                        disabled={isSummarizing}
+                        className="w-full p-3 rounded-xl border border-slate-200 text-sm text-slate-900 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                      >
+                        {subjects.map((sub, i) => (
+                          <option key={i} value={sub.name}>{sub.name}</option>
+                        ))}
+                        <option value="General Science & Technology">General Science & Technology</option>
+                        <option value="Engineering & Lab Practical">Engineering & Lab Practical</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Summarization Focus
+                      </label>
+                      <select
+                        value={pdfFocusMode}
+                        onChange={(e: any) => setPdfFocusMode(e.target.value)}
+                        disabled={isSummarizing}
+                        className="w-full p-3 rounded-xl border border-slate-200 text-sm text-slate-900 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                      >
+                        <option value="comprehensive">Comprehensive Lecture Notes</option>
+                        <option value="formulas">Formulas, Equations & Lab Steps</option>
+                        <option value="cheatsheet">1-Page Exam Cramming Cheat Sheet</option>
+                        <option value="flashcards">Revision Flashcards & Q&A</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Input Method Toggle */}
+                  <div>
+                    <div className="flex border-b border-slate-200 mb-4">
+                      <button
+                        onClick={() => setPdfInputMode('upload')}
+                        className={`pb-2.5 px-4 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                          pdfInputMode === 'upload'
+                            ? 'border-indigo-600 text-indigo-600'
+                            : 'border-transparent text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        <Upload size={14} />
+                        Upload PDF Document (.pdf, .txt)
+                      </button>
+                      <button
+                        onClick={() => setPdfInputMode('paste')}
+                        className={`pb-2.5 px-4 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+                          pdfInputMode === 'paste'
+                            ? 'border-indigo-600 text-indigo-600'
+                            : 'border-transparent text-slate-500 hover:text-slate-800'
+                        }`}
+                      >
+                        <FileText size={14} />
+                        Paste Lecture / Lab Text
+                      </button>
+                    </div>
+
+                    {pdfInputMode === 'upload' ? (
+                      <div>
+                        {!pdfFile ? (
+                          <label className="border-2 border-dashed border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/30 rounded-2xl p-10 text-center block cursor-pointer transition-all group">
+                            <input
+                              type="file"
+                              accept=".pdf,.txt,.md"
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  setPdfFile(e.target.files[0]);
+                                  setPdfError(null);
+                                }
+                              }}
+                              className="hidden"
+                            />
+                            <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                              <Upload size={28} />
+                            </div>
+                            <h3 className="font-bold text-slate-900 text-sm mb-1">Click to browse or drop PDF lecture manual</h3>
+                            <p className="text-slate-400 text-xs">
+                              Supports PDF textbooks, research papers, and lab manuals up to 10MB
+                            </p>
+                          </label>
+                        ) : (
+                          <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/50 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+                                <FileCheck size={20} />
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">{pdfFile.name}</p>
+                                <p className="text-xs text-slate-500">{(pdfFile.size / 1024).toFixed(1)} KB • Ready to summarize</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => setPdfFile(null)}
+                              disabled={isSummarizing}
+                              className="text-xs font-semibold text-rose-600 hover:text-rose-800 p-1.5 rounded-lg hover:bg-rose-50 transition-colors cursor-pointer"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <textarea
+                          rows={8}
+                          value={pdfPastedText}
+                          onChange={(e) => setPdfPastedText(e.target.value)}
+                          placeholder="Paste lecture excerpts, textbook chapters, or lab procedure notes here..."
+                          disabled={isSummarizing}
+                          className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600 focus:outline-none leading-relaxed font-mono"
+                        ></textarea>
+                        <p className="text-right text-[11px] text-slate-400 mt-1">
+                          {pdfPastedText.length} characters
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {pdfError && (
+                    <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
+                      <AlertCircle size={16} className="shrink-0 text-rose-500" />
+                      <span>{pdfError}</span>
+                    </div>
+                  )}
+
+                  {/* Submit Button */}
+                  <button
+                    onClick={handleSummarizePdf}
+                    disabled={isSummarizing}
+                    className="w-full py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-sm shadow-indigo-200 transition-all cursor-pointer disabled:opacity-60"
+                  >
+                    {isSummarizing ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        <span>Synthesizing Academic Material...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={18} />
+                        <span>Generate Smart Summary & Flashcards</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Animated Progress Box */}
+                  {isSummarizing && (
+                    <div className="p-5 rounded-2xl bg-slate-900 text-white space-y-3 animate-in fade-in">
+                      <div className="flex items-center justify-between text-xs font-semibold text-indigo-300">
+                        <span className="flex items-center gap-1.5">
+                          <RefreshCw size={13} className="animate-spin" />
+                          Analyzing Academic Content...
+                        </span>
+                        <span>{summarizeStep * 25}%</span>
+                      </div>
+                      <div className="w-full bg-white/20 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className="h-1.5 bg-gradient-to-r from-indigo-400 to-purple-400 rounded-full transition-all duration-500"
+                          style={{ width: `${summarizeStep * 25}%` }}
+                        ></div>
+                      </div>
+                      <ul className="text-xs text-slate-300 space-y-1.5 pt-1">
+                        <li className={`flex items-center gap-2 ${summarizeStep >= 1 ? 'text-emerald-400 font-medium' : 'text-slate-500'}`}>
+                          {summarizeStep >= 1 ? <Check size={13} /> : '•'} 1. Extracting text & structure from document
+                        </li>
+                        <li className={`flex items-center gap-2 ${summarizeStep >= 2 ? 'text-emerald-400 font-medium' : 'text-slate-500'}`}>
+                          {summarizeStep >= 2 ? <Check size={13} /> : '•'} 2. Synthesizing core theoretical concepts & takeaways
+                        </li>
+                        <li className={`flex items-center gap-2 ${summarizeStep >= 3 ? 'text-emerald-400 font-medium' : 'text-slate-500'}`}>
+                          {summarizeStep >= 3 ? <Check size={13} /> : '•'} 3. Extracting mathematical formulas & lab procedures
+                        </li>
+                        <li className={`flex items-center gap-2 ${summarizeStep >= 4 ? 'text-emerald-400 font-medium' : 'text-slate-500'}`}>
+                          {summarizeStep >= 4 ? <Check size={13} /> : '•'} 4. Generating revision flashcards & test questions
+                        </li>
+                      </ul>
+                    </div>
+                  )}
+
+                </div>
+              ) : (
+                /* SUMMARY RESULTS VIEW */
+                <div className="space-y-8 animate-in fade-in duration-300">
+                  
+                  {/* Results Header Card */}
+                  <div className="bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+                    <div className="relative z-10 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <span className="px-3 py-1 rounded-full bg-white/20 text-indigo-100 text-xs font-semibold backdrop-blur-sm">
+                            {summaryResult.totalPages ? `${summaryResult.totalPages} Page Document` : 'Lecture Material'}
+                          </span>
+                          <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-200 text-xs font-semibold border border-emerald-400/30 flex items-center gap-1">
+                            <Clock size={12} />
+                            {summaryResult.readingTimeMinutes || 3} min read
+                          </span>
+                        </div>
+                        <button
+                          onClick={handleCopySummary}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-medium border border-white/20 backdrop-blur-sm transition-colors cursor-pointer"
+                        >
+                          {copiedSummary ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+                          <span>{copiedSummary ? 'Copied to Clipboard!' : 'Copy Summary'}</span>
+                        </button>
+                      </div>
+
+                      <h3 className="text-2xl font-bold text-white tracking-tight">
+                        {summaryResult.title}
+                      </h3>
+                      <p className="text-indigo-100 text-sm leading-relaxed max-w-4xl">
+                        {summaryResult.overview}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Key Takeaways */}
+                  {summaryResult.keyTakeaways && summaryResult.keyTakeaways.length > 0 && (
+                    <div className="bg-indigo-50/50 border border-indigo-100 rounded-2xl p-6 space-y-3">
+                      <h4 className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <Award size={16} className="text-indigo-600" />
+                        Executive Key Takeaways
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {summaryResult.keyTakeaways.map((takeaway: string, idx: number) => (
+                          <div key={idx} className="flex items-start gap-2.5 p-3 rounded-xl bg-white border border-indigo-100/80 shadow-2xs">
+                            <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
+                              <Check size={12} />
+                            </div>
+                            <span className="text-xs text-slate-800 leading-relaxed font-medium">{takeaway}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Results Navigation Tabs */}
+                  <div className="flex border-b border-slate-200">
+                    <button
+                      onClick={() => setActiveResultTab('notes')}
+                      className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+                        activeResultTab === 'notes'
+                          ? 'border-indigo-600 text-indigo-600'
+                          : 'border-transparent text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <BookOpen size={16} />
+                      <span>Lecture Notes ({summaryResult.sections?.length || 0})</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveResultTab('formulas')}
+                      className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+                        activeResultTab === 'formulas'
+                          ? 'border-indigo-600 text-indigo-600'
+                          : 'border-transparent text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <FlaskConical size={16} />
+                      <span>Formulas & Procedures ({summaryResult.formulasAndDefinitions?.length || 0})</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveResultTab('flashcards')}
+                      className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+                        activeResultTab === 'flashcards'
+                          ? 'border-indigo-600 text-indigo-600'
+                          : 'border-transparent text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <Layers size={16} />
+                      <span>Revision Flashcards ({summaryResult.flashcards?.length || 0})</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveResultTab('exam')}
+                      className={`pb-3 px-5 text-sm font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+                        activeResultTab === 'exam'
+                          ? 'border-indigo-600 text-indigo-600'
+                          : 'border-transparent text-slate-500 hover:text-slate-800'
+                      }`}
+                    >
+                      <HelpCircle size={16} />
+                      <span>Exam Questions ({summaryResult.examQuestions?.length || 0})</span>
+                    </button>
+                  </div>
+
+                  {/* TAB 1: Lecture Sections Breakdown */}
+                  {activeResultTab === 'notes' && (
+                    <div className="space-y-6">
+                      {summaryResult.sections && summaryResult.sections.map((sec: any, idx: number) => (
+                        <div key={idx} className="p-6 rounded-2xl border border-slate-200 bg-white shadow-2xs space-y-3">
+                          <h4 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-bold">
+                              {idx + 1}
+                            </span>
+                            {sec.heading}
+                          </h4>
+                          <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                            {sec.summary}
+                          </p>
+                          {sec.bulletPoints && sec.bulletPoints.length > 0 && (
+                            <ul className="space-y-1.5 pt-2 pl-2">
+                              {sec.bulletPoints.map((bp: string, bIdx: number) => (
+                                <li key={bIdx} className="text-xs text-slate-700 flex items-start gap-2">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-1.5 shrink-0"></span>
+                                  <span>{bp}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* TAB 2: Formulas & Definitions */}
+                  {activeResultTab === 'formulas' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {summaryResult.formulasAndDefinitions && summaryResult.formulasAndDefinitions.map((item: any, idx: number) => (
+                        <div key={idx} className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-2.5">
+                          <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider block">
+                            {item.term}
+                          </span>
+                          <div className="bg-white p-3 rounded-xl border border-slate-200 text-xs font-mono text-indigo-950 font-semibold break-words">
+                            {item.definitionOrFormula}
+                          </div>
+                          <p className="text-xs text-slate-500 leading-relaxed">
+                            <span className="font-semibold text-slate-700">Lab/Exam Usage: </span>
+                            {item.exampleOrUsage}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* TAB 3: Interactive Revision Flashcards */}
+                  {activeResultTab === 'flashcards' && (
+                    <div className="space-y-4">
+                      <p className="text-xs text-slate-500">
+                        Click on any flashcard to flip and reveal the academic solution.
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {summaryResult.flashcards && summaryResult.flashcards.map((fc: any, idx: number) => {
+                          const isFlipped = revealedFlashcards[idx];
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => toggleFlashcard(idx)}
+                              className={`p-6 rounded-2xl border transition-all cursor-pointer select-none min-h-[160px] flex flex-col justify-between ${
+                                isFlipped
+                                  ? 'bg-gradient-to-br from-indigo-50 to-white border-indigo-300 shadow-sm'
+                                  : 'bg-white border-slate-200 hover:border-indigo-300 shadow-2xs'
+                              }`}
+                            >
+                              <div>
+                                <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider mb-2">
+                                  <span className={isFlipped ? 'text-indigo-600' : 'text-slate-400'}>
+                                    Card #{idx + 1} {isFlipped ? '• Solution' : '• Prompt'}
+                                  </span>
+                                  <span className="text-slate-400 flex items-center gap-1">
+                                    {isFlipped ? <EyeOff size={13} /> : <Eye size={13} />}
+                                    {isFlipped ? 'Hide' : 'Reveal'}
+                                  </span>
+                                </div>
+                                <p className={`text-sm font-semibold ${isFlipped ? 'text-indigo-950' : 'text-slate-800'} leading-relaxed`}>
+                                  {isFlipped ? fc.answer : fc.question}
+                                </p>
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-4">
+                                {isFlipped ? 'Click again to flip back' : 'Click card to see answer'}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 4: Practice Exam Questions */}
+                  {activeResultTab === 'exam' && (
+                    <div className="space-y-4">
+                      {summaryResult.examQuestions && summaryResult.examQuestions.map((eq: any, idx: number) => (
+                        <div key={idx} className="p-5 rounded-2xl border border-slate-200 bg-white space-y-3">
+                          <div className="flex items-start gap-3">
+                            <span className="w-6 h-6 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+                              {idx + 1}
+                            </span>
+                            <div className="flex-1 space-y-2">
+                              <p className="text-sm font-semibold text-slate-900 leading-relaxed">
+                                {eq.question}
+                              </p>
+                              <details className="group">
+                                <summary className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer list-none flex items-center gap-1">
+                                  <span>View Model Answer</span>
+                                </summary>
+                                <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 leading-relaxed font-normal">
+                                  {eq.answerKey}
+                                </div>
+                              </details>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                </div>
+              )}
+
             </div>
           )}
         </>
