@@ -1,30 +1,62 @@
+"use client";
+
+import { useEffect, useState } from 'react';
 import { 
   TrendingUp, 
   Clock, 
   Briefcase, 
-  Heart,
-  BookOpen,
-  ArrowRight,
-  Sparkles
+  Heart, 
+  BookOpen, 
+  ArrowRight, 
+  Sparkles,
+  Award
 } from 'lucide-react';
 import { demoStudent } from '@/data/studentData';
 import Link from 'next/link';
 
 export default function Dashboard() {
+  const [student, setStudent] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.user) {
+          setStudent(data.user);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const displayName = student?.name 
+    ? student.name.split(' ')[0] 
+    : demoStudent.name.split(' ')[0];
+
+  const isSchool = student?.educationLevel === 'School';
+  const academicScoreTitle = isSchool ? "Percentage" : "CGPA";
+  const academicScoreValue = isSchool 
+    ? (student?.percentage ? `${student.percentage}%` : "85%") 
+    : (student?.cgpa ? student.cgpa.toString() : demoStudent.cgpa.toString());
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
       
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-slate-900">Good Morning, {demoStudent.name.split(' ')[0]} 👋</h1>
-        <p className="text-slate-500 mt-1 text-lg">Here's your personalized student overview.</p>
+        <h1 className="text-3xl font-bold text-slate-900">Good Morning, {displayName} 👋</h1>
+        <p className="text-slate-500 mt-1 text-lg">
+          {student?.educationLevel === 'School' 
+            ? `Welcome to your School Portal (${student.gradeClass || 'High School'}). Here's your personalized student overview.`
+            : `Welcome to your College Portal (${student?.department || 'Engineering'}). Here's your personalized student overview.`
+          }
+        </p>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <KPICard 
-          title="CGPA" 
-          value={demoStudent.cgpa.toString()} 
+          title={academicScoreTitle} 
+          value={academicScoreValue} 
           icon={<TrendingUp size={24} className="text-indigo-600" />} 
           trend="+0.2"
           trendGood={true}
@@ -73,22 +105,29 @@ export default function Dashboard() {
                 <li className="flex items-start gap-3 bg-white/10 p-3 rounded-xl backdrop-blur-sm">
                   <div className="p-1.5 bg-indigo-500/50 rounded-md mt-0.5"><BookOpen size={16} /></div>
                   <div>
-                    <p className="font-medium">DBMS performance needs attention</p>
-                    <p className="text-indigo-200 text-sm">Your recent quiz scores were below average. Revise normalization for 25 minutes today.</p>
+                    <p className="font-medium">Scholarships matching your profile</p>
+                    <p className="text-indigo-200 text-sm">
+                      Based on your {student?.category || 'General'} category and family income (₹{student?.annualIncomeLPA || '4.0'} LPA), new scholarships are available!
+                    </p>
                   </div>
                 </li>
                 <li className="flex items-start gap-3 bg-white/10 p-3 rounded-xl backdrop-blur-sm">
-                  <div className="p-1.5 bg-indigo-500/50 rounded-md mt-0.5"><Briefcase size={16} /></div>
+                  <div className="p-1.5 bg-indigo-500/50 rounded-md mt-0.5"><Award size={16} /></div>
                   <div>
-                    <p className="font-medium">Resume keyword match is low</p>
-                    <p className="text-indigo-200 text-sm">Your resume could benefit from stronger project keywords for the Software Engineer role.</p>
+                    <p className="font-medium">Academic Recommendation</p>
+                    <p className="text-indigo-200 text-sm">
+                      Keep your {academicScoreTitle} above threshold to qualify for merit-based financial aid.
+                    </p>
                   </div>
                 </li>
               </ul>
-              <div className="mt-5">
-                <Link href="/assistant" className="inline-flex items-center gap-2 bg-white text-indigo-900 px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-indigo-50 transition-colors">
-                  Ask AI for a study plan
+              <div className="mt-5 flex gap-3">
+                <Link href="/scholarships" className="inline-flex items-center gap-2 bg-white text-indigo-900 px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-indigo-50 transition-colors">
+                  Explore Matched Scholarships
                   <ArrowRight size={16} />
+                </Link>
+                <Link href="/assistant" className="inline-flex items-center gap-2 bg-white/10 text-white border border-white/20 px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-white/20 transition-colors">
+                  Ask AI Tutor
                 </Link>
               </div>
             </div>
@@ -97,15 +136,15 @@ export default function Dashboard() {
           {/* Academic Overview */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-bold text-slate-900">Current Semester Performance</h3>
-              <Link href="/academic" className="text-sm text-primary font-medium hover:underline">View details</Link>
+              <h3 className="text-lg font-bold text-slate-900">Current Performance Tracker</h3>
+              <Link href="/academic" className="text-sm text-indigo-600 font-medium hover:underline">View details</Link>
             </div>
             
             <div className="space-y-4">
-              <SubjectProgress name="Data Structures" score={85} />
-              <SubjectProgress name="DBMS" score={68} />
-              <SubjectProgress name="Operating Systems" score={78} />
-              <SubjectProgress name="Computer Networks" score={82} />
+              <SubjectProgress name="Core Subjects" score={85} />
+              <SubjectProgress name="Practical / Labs" score={78} />
+              <SubjectProgress name="Assignments" score={90} />
+              <SubjectProgress name="Attendance" score={92} />
             </div>
           </div>
 
@@ -116,18 +155,20 @@ export default function Dashboard() {
           
           {/* Career Target */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">Career Goal</h3>
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-              <p className="text-sm text-slate-500 mb-1">Target Role</p>
-              <p className="font-semibold text-slate-900 mb-4">{demoStudent.targetRole}</p>
-              
-              <p className="text-sm text-slate-500 mb-2">Top Skills Progress</p>
-              <div className="flex flex-wrap gap-2">
-                {demoStudent.skills.map(skill => (
-                  <span key={skill} className="px-3 py-1 bg-white border border-slate-200 rounded-full text-xs font-medium text-slate-700">
-                    {skill}
-                  </span>
-                ))}
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Student Profile Summary</h3>
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+              <div>
+                <p className="text-xs text-slate-400 font-semibold uppercase">Education</p>
+                <p className="font-semibold text-slate-900 text-sm">{student?.educationLevel || "College"} Student</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 font-semibold uppercase">Student ID</p>
+                <p className="font-semibold text-slate-900 text-sm">{student?.studentId || "—"}</p>
+              </div>
+              <div className="pt-2">
+                <Link href="/profile" className="text-xs font-semibold text-indigo-600 hover:underline flex items-center gap-1">
+                  Edit Full Profile &rarr;
+                </Link>
               </div>
             </div>
           </div>
@@ -135,27 +176,27 @@ export default function Dashboard() {
           {/* Upcoming Tasks */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-slate-900">Today's Plan</h3>
+              <h3 className="text-lg font-bold text-slate-900">Today's Goals</h3>
             </div>
             <div className="space-y-3">
               <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 group">
-                <input type="checkbox" className="w-5 h-5 rounded-md border-slate-300 text-primary focus:ring-primary" />
+                <input type="checkbox" className="w-5 h-5 rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-slate-900 group-hover:text-primary transition-colors">Practice Trees (DSA)</p>
-                  <p className="text-xs text-slate-500">30 min • High Priority</p>
+                  <p className="text-sm font-medium text-slate-900 group-hover:text-indigo-600 transition-colors">Apply for Matched Scholarship</p>
+                  <p className="text-xs text-slate-500">Deadline approaching</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 group">
-                <input type="checkbox" className="w-5 h-5 rounded-md border-slate-300 text-primary focus:ring-primary" />
+                <input type="checkbox" className="w-5 h-5 rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-slate-900 group-hover:text-primary transition-colors">Revise Normalization</p>
-                  <p className="text-xs text-slate-500">25 min • Medium Priority</p>
+                  <p className="text-sm font-medium text-slate-900 group-hover:text-indigo-600 transition-colors">Review AI Study Plan</p>
+                  <p className="text-xs text-slate-500">25 min • High Priority</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 group">
-                <input type="checkbox" className="w-5 h-5 rounded-md border-slate-300 text-primary focus:ring-primary" />
+                <input type="checkbox" className="w-5 h-5 rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-slate-900 group-hover:text-primary transition-colors">Daily Wellness Check-in</p>
+                  <p className="text-sm font-medium text-slate-900 group-hover:text-indigo-600 transition-colors">Daily Wellness Check-in</p>
                   <p className="text-xs text-slate-500">5 min</p>
                 </div>
               </div>

@@ -25,21 +25,27 @@ export async function POST(req: Request) {
     } = body;
 
     if (!name || !email || !studentId || !password) {
-      return NextResponse.json({ error: 'Missing required basic fields' }, { status: 400 });
+      return NextResponse.json({ error: 'Missing required fields: Name, Email, Student ID, and Password are required.' }, { status: 400 });
     }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanStudentId = studentId.trim();
 
     // Check if user already exists
     const existingUser = await prisma.student.findFirst({
       where: {
         OR: [
-          { email },
-          { studentId }
+          { email: { equals: cleanEmail, mode: 'insensitive' } },
+          { studentId: { equals: cleanStudentId, mode: 'insensitive' } }
         ]
       }
     });
 
     if (existingUser) {
-      return NextResponse.json({ error: 'Student with this email or ID already exists' }, { status: 409 });
+      if (existingUser.email.toLowerCase() === cleanEmail) {
+        return NextResponse.json({ error: 'An account with this email already exists. Please log in.' }, { status: 409 });
+      }
+      return NextResponse.json({ error: 'An account with this Student ID already exists.' }, { status: 409 });
     }
 
     // Hash password
@@ -48,11 +54,11 @@ export async function POST(req: Request) {
     // Create user
     const student = await prisma.student.create({
       data: {
-        name,
-        email,
-        studentId,
+        name: name.trim(),
+        email: cleanEmail,
+        studentId: cleanStudentId,
         password: hashedPassword,
-        age: parseInt(age) || 20,
+        age: age ? parseInt(age) : 20,
         gender: gender || 'male',
         category: category || 'General',
         educationLevel: educationLevel || 'College',
@@ -66,7 +72,7 @@ export async function POST(req: Request) {
       }
     });
 
-    // Create session
+    // Create session cookie
     await createSession({
       id: student.id,
       email: student.email,
@@ -74,7 +80,11 @@ export async function POST(req: Request) {
       studentId: student.studentId
     });
 
-    return NextResponse.json({ success: true, message: 'Registration successful' });
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Registration successful',
+      user: { id: student.id, email: student.email, name: student.name, studentId: student.studentId }
+    });
 
   } catch (error: any) {
     console.error('Registration error:', error);
