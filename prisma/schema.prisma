@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Student {
+  id                 String         @id @default(cuid())
+  studentId          String         @unique
+  name               String
+  email              String         @unique
+  age                Int            @default(20)
+  gender             String         @default("male")
+  category           String         @default("General")
+  department         String         @default("Engineering")
+  semester           String         @default("S5")
+  cgpa               Float          @default(8.0)
+  annualIncomeLPA    Float          @default(4.0)
+  isDifferentlyAbled Boolean        @default(false)
+  chatMessages       ChatMessage[]
+  applications       Application[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+}
+
+model Scholarship {
+  id                 String         @id @default(cuid())
+  slug               String         @unique
+  name               String
+  provider           String
+  amount             String
+  deadline           DateTime
+  minAge             Int            @default(17)
+  maxAge             Int            @default(30)
+  minCgpa            Float          @default(6.0)
+  maxIncomeLPA       Float          @default(8.0)
+  eligibleGenders    String[]       @default(["any"])
+  eligibleCategories String[]       @default(["all"])
+  eligibleStreams    String[]       @default(["All"])
+  specialCriteria    String?
+  applicationLink    String
+  description        String
+  applications       Application[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  role      String   // 'user' | 'assistant'
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+}
+
+model Application {
+  id            String      @id @default(cuid())
+  studentId     String
+  student       Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  scholarshipId String
+  scholarship   Scholarship @relation(fields: [scholarshipId], references: [id], onDelete: Cascade)
+  status        String      @default("PENDING") // 'PENDING' | 'SUBMITTED' | 'APPROVED' | 'REJECTED'
+  submittedAt   DateTime?
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
