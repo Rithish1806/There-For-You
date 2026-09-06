@@ -27,14 +27,18 @@ function sanitizeConnectionString(rawUrl: string): string {
   return url;
 }
 
-const rawUrl = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
-const connectionString = sanitizeConnectionString(rawUrl);
-
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
 function getPrismaClient(): PrismaClient {
+  const rawUrl = process.env.DIRECT_URL || process.env.DATABASE_URL || '';
+  const connectionString = sanitizeConnectionString(rawUrl);
+
+  if (!connectionString) {
+    console.error("FATAL: Neither DIRECT_URL nor DATABASE_URL is set in environment variables!");
+  }
+
   const pool = new Pool({
     connectionString,
     ssl: { rejectUnauthorized: false },

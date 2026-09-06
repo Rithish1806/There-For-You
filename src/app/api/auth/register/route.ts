@@ -5,6 +5,12 @@ import { createSession } from '@/lib/auth';
 
 export async function POST(req: Request) {
   try {
+    if (!process.env.DIRECT_URL && !process.env.DATABASE_URL) {
+      return NextResponse.json({
+        error: 'Database connection is not configured on Render. Please add DATABASE_URL and DIRECT_URL in your Render Environment settings.'
+      }, { status: 500 });
+    }
+
     const body = await req.json();
     const {
       name,
@@ -90,6 +96,11 @@ export async function POST(req: Request) {
     console.error('Registration error:', error);
     if (error?.code === 'P2002') {
       return NextResponse.json({ error: 'A student with this email or Student ID already exists.' }, { status: 409 });
+    }
+    if (error?.code === 'ECONNREFUSED' || error?.message?.includes('ECONNREFUSED') || error?.message?.includes('invocation:')) {
+      return NextResponse.json({
+        error: 'Database connection failed. Please ensure DATABASE_URL and DIRECT_URL are configured in your Render dashboard.'
+      }, { status: 500 });
     }
     return NextResponse.json({ error: error?.message || 'Failed to register student. Please try again.' }, { status: 500 });
   }

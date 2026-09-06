@@ -5,6 +5,12 @@ import { createSession } from '@/lib/auth';
 
 export async function POST(req: Request) {
   try {
+    if (!process.env.DIRECT_URL && !process.env.DATABASE_URL) {
+      return NextResponse.json({
+        error: 'Database connection is not configured on Render. Please add DATABASE_URL and DIRECT_URL in your Render Environment settings.'
+      }, { status: 500 });
+    }
+
     const body = await req.json();
     const { identifier, password } = body;
 
@@ -51,6 +57,11 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error('Login error:', error);
+    if (error?.code === 'ECONNREFUSED' || error?.message?.includes('ECONNREFUSED') || error?.message?.includes('invocation:')) {
+      return NextResponse.json({
+        error: 'Database connection failed. Please ensure DATABASE_URL and DIRECT_URL are configured in your Render dashboard.'
+      }, { status: 500 });
+    }
     return NextResponse.json({ error: error?.message || 'An unexpected error occurred during login.' }, { status: 500 });
   }
 }
