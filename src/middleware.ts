@@ -8,12 +8,14 @@ export function middleware(request: NextRequest) {
                       request.nextUrl.pathname.startsWith('/register') ||
                       request.nextUrl.pathname.startsWith('/forgot-password') ||
                       request.nextUrl.pathname.startsWith('/reset-password');
-                      
+
+  const isPublicRoute = isAuthRoute || request.nextUrl.pathname === '/api/health';
   const isProtectedApiRoute = request.nextUrl.pathname.startsWith('/api/') && 
-                             !request.nextUrl.pathname.startsWith('/api/auth/');
+                             !request.nextUrl.pathname.startsWith('/api/auth/') &&
+                             request.nextUrl.pathname !== '/api/health';
 
   // Redirect unauthenticated users to login page if they try to access protected routes
-  if (!token && !isAuthRoute) {
+  if (!token && !isPublicRoute) {
     if (isProtectedApiRoute) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
