@@ -25,6 +25,7 @@ model Student {
   cgpa               Float          @default(8.0)
   annualIncomeLPA    Float          @default(4.0)
   isDifferentlyAbled Boolean        @default(false)
+  academicDetails    String?        @db.Text
   chatMessages       ChatMessage[]
   applications       Application[]
   createdAt          DateTime       @default(now())

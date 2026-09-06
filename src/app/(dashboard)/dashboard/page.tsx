@@ -36,7 +36,18 @@ export default function Dashboard() {
   const academicScoreTitle = isSchool ? "Percentage" : "CGPA";
   const academicScoreValue = isSchool 
     ? (student?.percentage ? `${student.percentage}%` : "85%") 
-    : (student?.cgpa ? student.cgpa.toString() : demoStudent.cgpa.toString());
+    : (student?.cgpa !== undefined && student?.cgpa !== null ? Number(student.cgpa).toFixed(2) : "8.00");
+
+  let academicData: any = null;
+  try {
+    if (student?.academicDetails) {
+      academicData = typeof student.academicDetails === 'string' ? JSON.parse(student.academicDetails) : student.academicDetails;
+    }
+  } catch (e) {}
+
+  const attendanceValue = academicData?.attendance 
+    ? `${academicData.attendance}%` 
+    : (student?.attendance ? `${student.attendance}%` : "88%");
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -64,10 +75,10 @@ export default function Dashboard() {
         />
         <KPICard 
           title="Attendance" 
-          value={`${demoStudent.attendance}%`} 
+          value={attendanceValue} 
           icon={<Clock size={24} className="text-emerald-600" />} 
-          trend="-2%"
-          trendGood={false}
+          trend={academicData ? "Logged" : "Default"}
+          trendGood={true}
           bg="bg-emerald-50"
         />
         <KPICard 
@@ -141,10 +152,22 @@ export default function Dashboard() {
             </div>
             
             <div className="space-y-4">
-              <SubjectProgress name="Core Subjects" score={85} />
-              <SubjectProgress name="Practical / Labs" score={78} />
-              <SubjectProgress name="Assignments" score={90} />
-              <SubjectProgress name="Attendance" score={92} />
+              {academicData?.subjects && academicData.subjects.length > 0 ? (
+                academicData.subjects.slice(0, 4).map((sub: any, i: number) => (
+                  <SubjectProgress 
+                    key={i} 
+                    name={sub.name || `Subject ${i + 1}`} 
+                    score={Math.min(100, Math.round(Number(sub.marks) || 75))} 
+                  />
+                ))
+              ) : (
+                <>
+                  <SubjectProgress name="Core Subjects" score={85} />
+                  <SubjectProgress name="Practical / Labs" score={78} />
+                  <SubjectProgress name="Assignments" score={90} />
+                  <SubjectProgress name="Attendance" score={92} />
+                </>
+              )}
             </div>
           </div>
 

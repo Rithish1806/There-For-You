@@ -1,16 +1,33 @@
 "use client";
 
+import { useEffect, useState } from 'react';
 import { Briefcase, FileText, Target, Map, ArrowRight, Upload } from 'lucide-react';
 import { demoStudent } from '@/data/studentData';
 
 export default function CareerPage() {
+  const [student, setStudent] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.user) setStudent(data.user);
+      })
+      .catch(() => {});
+  }, []);
+
+  const studentName = student?.name || demoStudent.name;
+  const targetRole = student?.educationLevel === 'School' ? 'Higher Secondary / College Prep' : 'Software Development Engineer';
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
       
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-slate-900">Career & Placement</h1>
-        <p className="text-slate-500 mt-1">Prepare for your dream role as a {demoStudent.targetRole}.</p>
+        <p className="text-slate-500 mt-1">
+          Career guidance and roadmap for <span className="font-semibold text-slate-800">{studentName}</span> • Target: {targetRole}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
