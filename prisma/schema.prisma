@@ -26,6 +26,8 @@ model Student {
   annualIncomeLPA    Float          @default(4.0)
   isDifferentlyAbled Boolean        @default(false)
   academicDetails    String?        @db.Text
+  resumeAnalysis     String?        @db.Text
+  resumeAtsScore     Int?           @default(75)
   chatMessages       ChatMessage[]
   applications       Application[]
   createdAt          DateTime       @default(now())

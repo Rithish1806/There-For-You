@@ -49,6 +49,10 @@ export default function Dashboard() {
     ? `${academicData.attendance}%` 
     : (student?.attendance ? `${student.attendance}%` : "88%");
 
+  const placementScore = student?.resumeAtsScore 
+    ? `${student.resumeAtsScore}%` 
+    : `${demoStudent.placementReadiness}%`;
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
       
@@ -83,9 +87,9 @@ export default function Dashboard() {
         />
         <KPICard 
           title="Placement Readiness" 
-          value={`${demoStudent.placementReadiness}%`} 
+          value={placementScore} 
           icon={<Briefcase size={24} className="text-blue-600" />} 
-          trend="+15%"
+          trend={student?.resumeAtsScore ? "ATS Evaluated" : "+15%"}
           trendGood={true}
           bg="bg-blue-50"
         />

@@ -29,6 +29,8 @@ export async function GET() {
         annualIncomeLPA: true,
         isDifferentlyAbled: true,
         academicDetails: true,
+        resumeAnalysis: true,
+        resumeAtsScore: true,
         createdAt: true,
         updatedAt: true,
       }
@@ -67,7 +69,9 @@ export async function PUT(req: Request) {
       cgpa,
       annualIncomeLPA,
       isDifferentlyAbled,
-      academicDetails
+      academicDetails,
+      resumeAnalysis,
+      resumeAtsScore
     } = body;
 
     const updated = await prisma.student.update({
@@ -86,6 +90,8 @@ export async function PUT(req: Request) {
         ...(annualIncomeLPA !== undefined && { annualIncomeLPA: annualIncomeLPA ? parseFloat(annualIncomeLPA) : 4.0 }),
         ...(isDifferentlyAbled !== undefined && { isDifferentlyAbled: isDifferentlyAbled === true || isDifferentlyAbled === 'true' }),
         ...(academicDetails !== undefined && { academicDetails: typeof academicDetails === 'string' ? academicDetails : JSON.stringify(academicDetails) }),
+        ...(resumeAnalysis !== undefined && { resumeAnalysis: typeof resumeAnalysis === 'string' ? resumeAnalysis : JSON.stringify(resumeAnalysis) }),
+        ...(resumeAtsScore !== undefined && { resumeAtsScore: resumeAtsScore !== null ? parseInt(resumeAtsScore) : null }),
       }
     });
 
