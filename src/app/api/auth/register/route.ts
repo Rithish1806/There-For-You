@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 import { createSession } from '@/lib/auth';
-
-const prisma = new PrismaClient();
 
 export async function POST(req: Request) {
   try {
@@ -62,7 +60,7 @@ export async function POST(req: Request) {
         percentage: percentage ? parseFloat(percentage) : null,
         department: department || 'General',
         semester: semester || 'S1',
-        cgpa: cgpa ? parseFloat(cgpa) : null,
+        cgpa: cgpa ? parseFloat(cgpa) : 8.0,
         annualIncomeLPA: annualIncomeLPA ? parseFloat(annualIncomeLPA) : 4.0,
         isDifferentlyAbled: isDifferentlyAbled === 'true' || isDifferentlyAbled === true,
       }
