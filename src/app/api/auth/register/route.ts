@@ -78,6 +78,9 @@ export async function POST(req: Request) {
 
   } catch (error: any) {
     console.error('Registration error:', error);
-    return NextResponse.json({ error: 'Failed to register student. Please try again.' }, { status: 500 });
+    if (error?.code === 'P2002') {
+      return NextResponse.json({ error: 'A student with this email or Student ID already exists.' }, { status: 409 });
+    }
+    return NextResponse.json({ error: error?.message || 'Failed to register student. Please try again.' }, { status: 500 });
   }
 }
