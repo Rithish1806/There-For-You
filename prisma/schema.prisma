@@ -12,6 +12,12 @@ model Student {
   studentId          String         @unique
   name               String
   email              String         @unique
+  password           String?
+  educationLevel     String         @default("College")
+  gradeClass         String?
+  percentage         Float?
+  resetPasswordToken String?
+  resetPasswordExpires DateTime?
   age                Int            @default(20)
   gender             String         @default("male")
   category           String         @default("General")

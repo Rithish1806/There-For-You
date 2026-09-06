@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, 
   MessageSquare, 
@@ -31,6 +32,29 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [user, setUser] = useState<{name: string, studentId: string} | null>(null);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(res => res.json())
+      .then(data => {
+        if (data.user) {
+          setUser(data.user);
+        }
+      })
+      .catch(console.error);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/');
+      router.refresh();
+    } catch (error) {
+      console.error('Logout failed', error);
+    }
+  };
 
   return (
     <aside className="w-64 h-screen bg-surface border-r border-slate-200 flex flex-col fixed left-0 top-0 z-40">
@@ -64,18 +88,28 @@ export default function Sidebar() {
       </nav>
       
       <div className="p-4 border-t border-slate-200 space-y-1">
+        {user && (
+          <div className="flex items-center gap-3 px-4 py-3 mb-2 rounded-xl bg-slate-50 border border-slate-100">
+            <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold">
+              {user.name.charAt(0)}
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-sm font-bold text-slate-900 truncate">{user.name}</p>
+              <p className="text-xs text-slate-500 truncate">{user.studentId}</p>
+            </div>
+          </div>
+        )}
         <button className="flex w-full items-center gap-3 px-4 py-3 rounded-xl text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition-all">
           <HelpCircle size={20} />
           <span>Help</span>
         </button>
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-emerald-600 bg-emerald-50">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-          <span className="font-medium text-sm">Demo Mode Active</span>
-        </div>
-        <Link href="/" className="flex items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all">
+        <button 
+          onClick={handleLogout}
+          className="flex w-full items-center gap-3 px-4 py-3 rounded-xl text-red-500 hover:bg-red-50 transition-all"
+        >
           <LogOut size={20} />
           <span>Logout</span>
-        </Link>
+        </button>
       </div>
     </aside>
   );

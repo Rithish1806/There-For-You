@@ -1,9 +1,49 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Sparkles, ArrowRight, BookOpen, Briefcase, HeartPulse } from "lucide-react";
+import { Sparkles, ArrowRight, BookOpen, Briefcase, HeartPulse, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!identifier || !password) {
+      setError("Please fill in all fields");
+      return;
+    }
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to log in");
+      }
+
+      router.push("/dashboard");
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Branding */}
@@ -56,20 +96,29 @@ export default function LoginPage() {
             <p className="text-slate-500">Sign in to continue to There For You</p>
           </div>
 
-          <form className="space-y-5" onSubmit={(e) => e.preventDefault()}>
+          <form className="space-y-5" onSubmit={handleLogin}>
+            {error && (
+              <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-100">
+                {error}
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Student ID / Email</label>
               <input 
                 type="text" 
-                defaultValue="7376242AL195"
+                value={identifier}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="Enter your Student ID or Email"
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
               <input 
-                type="password" 
-                defaultValue="password123"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
               />
             </div>
@@ -79,23 +128,27 @@ export default function LoginPage() {
                 <input type="checkbox" className="w-4 h-4 rounded text-primary focus:ring-primary" defaultChecked />
                 <span className="text-sm text-slate-600">Remember me</span>
               </label>
-              <a href="#" className="text-sm text-primary hover:underline font-medium">Forgot password?</a>
+              <Link href="/forgot-password" className="text-sm text-primary hover:underline font-medium">
+                Forgot password?
+              </Link>
             </div>
 
-            <button className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors shadow-sm">
-              Sign In
+            <button 
+              type="submit" 
+              disabled={isLoading}
+              className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-medium hover:bg-slate-800 transition-colors shadow-sm flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isLoading ? <Loader2 size={20} className="animate-spin" /> : "Sign In"}
             </button>
             
-            <div className="relative flex items-center py-4">
-              <div className="flex-grow border-t border-slate-200"></div>
-              <span className="flex-shrink-0 mx-4 text-slate-400 text-sm">Or</span>
-              <div className="flex-grow border-t border-slate-200"></div>
+            <div className="text-center mt-6">
+              <p className="text-sm text-slate-600">
+                Don't have an account?{" "}
+                <Link href="/register" className="text-primary font-medium hover:underline">
+                  Sign up
+                </Link>
+              </p>
             </div>
-
-            <Link href="/dashboard" className="w-full py-3.5 bg-indigo-50 text-indigo-700 rounded-xl font-medium hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2">
-              Continue as Demo Student
-              <ArrowRight size={18} />
-            </Link>
           </form>
           
           <p className="text-center text-sm text-slate-500 mt-8">
