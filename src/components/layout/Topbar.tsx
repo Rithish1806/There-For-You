@@ -36,14 +36,21 @@ export default function Topbar() {
       </div>
       
       <div className="flex items-center gap-6">
-        <Link href="/assistant" className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors">
-          <Sparkles size={16} />
-          <span className="text-sm font-medium">Ask AI Tutor</span>
+        <Link 
+          href="/assistant" 
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-700 border border-indigo-200/60 rounded-full hover:bg-indigo-100/70 hover:border-indigo-300 transition-all hover-lift shadow-xs group"
+        >
+          <Sparkles size={16} className="text-indigo-600 group-hover:rotate-12 transition-transform duration-300 animate-pulse" />
+          <span className="text-sm font-semibold">Ask AI Tutor</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
         </Link>
         
-        <Link href="/notifications" className="relative text-slate-500 hover:text-slate-900 transition-colors">
+        <Link 
+          href="/notifications" 
+          className="relative text-slate-500 hover:text-slate-900 transition-colors p-1.5 rounded-xl hover:bg-slate-100"
+        >
           <Bell size={22} />
-          <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+          <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full ring-2 ring-white animate-pulse"></span>
         </Link>
         
         <Link href="/profile" className="flex items-center gap-3 pl-6 border-l border-slate-200 group">
@@ -51,7 +58,7 @@ export default function Topbar() {
             <span className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">{name}</span>
             <span className="text-xs text-slate-500">{studentId}</span>
           </div>
-          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm group-hover:scale-105 transition-transform">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm group-hover:scale-110 group-hover:shadow-indigo-300 group-hover:shadow-md transition-all duration-300">
             {initial}
           </div>
         </Link>

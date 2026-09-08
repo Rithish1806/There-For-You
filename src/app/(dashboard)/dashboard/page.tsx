@@ -240,7 +240,7 @@ export default function Dashboard() {
 
 function KPICard({ title, value, icon, trend, trendGood, bg }: any) {
   return (
-    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between group hover:shadow-md transition-shadow">
+    <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between group hover-lift transition-all cursor-default">
       <div>
         <p className="text-sm font-medium text-slate-500 mb-1">{title}</p>
         <div className="flex items-baseline gap-2">

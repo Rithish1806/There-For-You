@@ -45,6 +45,9 @@ export default function CareerPage() {
   const [pastedText, setPastedText] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState(1);
+  const [analysisCompleted, setAnalysisCompleted] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [isReportHighlighted, setIsReportHighlighted] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [copiedKeyword, setCopiedKeyword] = useState<string | null>(null);
@@ -166,16 +169,44 @@ export default function CareerPage() {
       }
 
       const result = await response.json();
+      setAnalysisStep(4);
+      setAnalysisCompleted(true);
       setAnalysisResult(result.analysis);
       setStudent((prev: any) => ({
         ...prev,
         resumeAtsScore: result.analysis.atsScore
       }));
 
+      // Automatically close modal after evaluation with smooth transition
+      setTimeout(() => {
+        setIsModalOpen(false);
+        setIsAnalyzing(false);
+        setAnalysisCompleted(false);
+        setShowSuccessToast(true);
+        setIsReportHighlighted(true);
+
+        // Smoothly scroll down to the generated ATS report
+        setTimeout(() => {
+          const reportElem = document.getElementById('ats-report-card');
+          if (reportElem) {
+            reportElem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 150);
+
+        // Remove highlight pulse after 3.5 seconds
+        setTimeout(() => {
+          setIsReportHighlighted(false);
+        }, 3500);
+
+        // Auto-dismiss toast after 6 seconds
+        setTimeout(() => {
+          setShowSuccessToast(false);
+        }, 6000);
+      }, 800);
+
     } catch (err: any) {
       clearInterval(stepInterval);
       setErrorMessage(err.message || 'An unexpected error occurred during resume analysis.');
-    } finally {
       setIsAnalyzing(false);
     }
   };
@@ -199,8 +230,34 @@ export default function CareerPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 pb-16">
+    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 pb-16 relative">
       
+      {/* Animated Success Toast when Modal Closes */}
+      {showSuccessToast && (
+        <div className="fixed top-24 right-8 z-50 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3.5 rounded-2xl shadow-2xl border border-indigo-500/40 flex items-center gap-3.5 animate-slide-up hover-lift">
+          <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center animate-bounce">
+            <CheckCircle2 size={20} />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-white flex items-center gap-1.5">
+              Resume Analyzed Successfully!
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">
+                {analysisResult?.atsScore}/100
+              </span>
+            </p>
+            <p className="text-[11px] text-slate-300">
+              Evaluated against {selectedRole}. Scroll down to explore the audit roadmap.
+            </p>
+          </div>
+          <button 
+            onClick={() => setShowSuccessToast(false)} 
+            className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors ml-1 cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -268,7 +325,14 @@ export default function CareerPage() {
 
           {/* Embedded Resume ATS Report Card (if analyzed) */}
           {analysisResult ? (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 space-y-6">
+            <div 
+              id="ats-report-card" 
+              className={`bg-white rounded-2xl shadow-sm border p-8 space-y-6 transition-all duration-700 ${
+                isReportHighlighted 
+                  ? 'ring-4 ring-indigo-500/40 border-indigo-400 shadow-2xl scale-[1.01]' 
+                  : 'border-slate-200'
+              }`}
+            >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-5">
                 <div>
                   <div className="flex items-center gap-2.5">
@@ -684,7 +748,7 @@ export default function CareerPage() {
               )}
 
               {/* Loading State with Animated Steps */}
-              {isAnalyzing && (
+              {isAnalyzing && !analysisCompleted && (
                 <div className="p-6 rounded-2xl bg-slate-900 text-white space-y-4 animate-in fade-in">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-indigo-300 uppercase tracking-wider flex items-center gap-1.5">
@@ -717,6 +781,21 @@ export default function CareerPage() {
                       4. Formulating actionable rewrite recommendations
                     </li>
                   </ul>
+                </div>
+              )}
+
+              {/* Completion Animation State */}
+              {analysisCompleted && (
+                <div className="p-6 rounded-2xl bg-emerald-950/90 border border-emerald-500/40 text-white space-y-2 animate-slide-up">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center animate-bounce">
+                      <CheckCircle2 size={24} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-emerald-300">Analysis Complete! Score: {analysisResult?.atsScore || 80}/100</h4>
+                      <p className="text-xs text-emerald-100/80">Closing tab and opening your personalized ATS report...</p>
+                    </div>
+                  </div>
                 </div>
               )}
 

@@ -42,4 +42,154 @@
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.6);
   }
+
+  /* Micro-interactions & animations */
+  .hover-lift {
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px -8px rgba(79, 70, 229, 0.12), 0 4px 8px -4px rgba(0, 0, 0, 0.04);
+  }
+
+  .glow-indigo {
+    box-shadow: 0 0 20px -3px rgba(99, 102, 241, 0.35);
+  }
+
+  .glow-emerald {
+    box-shadow: 0 0 20px -3px rgba(16, 185, 129, 0.35);
+  }
 }
+
+/* Custom Animation Keyframes */
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(1deg);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+    box-shadow: 0 0 25px rgba(99, 102, 241, 0.7);
+  }
+}
+
+@keyframes typewriterBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmerEffect {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes rippleWave {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.08); opacity: 0.4; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.animate-float-slow {
+  animation: floatSlow 4s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2.5s ease-in-out infinite;
+}
+
+.animate-typewriter-cursor {
+  animation: typewriterBlink 0.8s infinite;
+}
+
+.animate-slide-up {
+  animation: slideUpFade 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: shimmerEffect 2.5s infinite;
+}
+
+.animate-ripple {
+  animation: rippleWave 3s ease-in-out infinite;
+}
+
+/* =========================================================
+   CRYSTAL-CLEAR CODE BLOCK & INLINE CODE STYLES
+   Fixes illegible light-text-on-white-background bug in markdown
+   ========================================================= */
+
+/* Fenced Code Block Container (<pre>) */
+.prose pre {
+  background-color: #0f172a !important; /* Deep dark slate-900 */
+  color: #f1f5f9 !important; /* Crisp readable light text */
+  border-radius: 0.875rem !important;
+  padding: 1rem 1.25rem !important;
+  margin: 0.875rem 0 !important;
+  border: 1px solid #1e293b !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1) !important;
+  overflow-x: auto !important;
+  font-family: var(--font-mono, monospace) !important;
+  font-size: 0.825rem !important;
+  line-height: 1.65 !important;
+}
+
+/* Code inside <pre> MUST be transparent background and crisp readable color */
+.prose pre code {
+  background-color: transparent !important;
+  background: transparent !important;
+  color: #f8fafc !important; /* Bright, high-contrast text */
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  font-weight: 400 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  display: block !important;
+}
+
+/* Remove default backticks added by @tailwindcss/typography */
+.prose pre code::before,
+.prose pre code::after,
+.prose code::before,
+.prose code::after {
+  content: "" !important;
+}
+
+/* Inline code (e.g. `npm install` or variable names not in a pre block) */
+.prose :not(pre) > code {
+  background-color: #f1f5f9 !important; /* Soft slate-100 */
+  color: #4338ca !important; /* Vibrant deep indigo-700 */
+  border: 1px solid #e2e8f0 !important;
+  padding: 0.2rem 0.45rem !important;
+  border-radius: 0.375rem !important;
+  font-size: 0.85em !important;
+  font-weight: 600 !important;
+  font-family: var(--font-mono, monospace) !important;
+}
+
+
