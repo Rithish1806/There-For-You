@@ -28,7 +28,19 @@ import {
   EyeOff,
   FileCheck,
   RefreshCw,
-  X
+  X,
+  Brain,
+  Timer,
+  CheckSquare,
+  ListTodo,
+  Target,
+  Flame,
+  Zap,
+  ArrowRight,
+  Coffee,
+  HeartPulse,
+  Share2,
+  Save
 } from 'lucide-react';
 
 interface SubjectItem {
@@ -43,10 +55,41 @@ interface LabItem {
   internalScore: number;
 }
 
+export interface LessonItem {
+  id: string;
+  subject: string;
+  topic: string;
+}
+
+export interface StudyPlanBlock {
+  id: string;
+  timeSlot: string;
+  subject: string;
+  lesson: string;
+  type: 'deep_study' | 'spaced_repetition' | 'practice_problems' | 'break' | 'quick_quiz';
+  durationMinutes: number;
+  goal: string;
+  priority: 'High' | 'Medium' | 'Low';
+  status: 'pending' | 'completed';
+}
+
+export interface DailyPlanData {
+  date?: string;
+  dayGoal: string;
+  motivationalQuote: string;
+  pedagogicalTip: string;
+  totalMinutesPlanned: number;
+  blocks: StudyPlanBlock[];
+}
+
 interface AcademicData {
   attendance: number;
   subjects: SubjectItem[];
   labs: LabItem[];
+  completedLessons?: LessonItem[];
+  currentlyStudyingLessons?: LessonItem[];
+  dailyPlan?: DailyPlanData | null;
+  wellnessData?: any;
 }
 
 export default function AcademicPage() {
@@ -89,6 +132,41 @@ export default function AcademicPage() {
     { id: 3, title: 'Submit OS Lab Record Experiment 8', time: '45 min', priority: 'High', completed: true },
   ]);
 
+  // Daily Study Planner Enhanced State
+  const [completedLessons, setCompletedLessons] = useState<LessonItem[]>([
+    { id: 'comp-1', subject: 'Data Structures & Algorithms', topic: 'Stacks, Queues & Linked Lists' },
+    { id: 'comp-2', subject: 'Database Management Systems', topic: 'Relational Model & SQL Queries' },
+    { id: 'comp-3', subject: 'Operating Systems', topic: 'Process Scheduling & Threads' },
+  ]);
+  const [currentlyStudyingLessons, setCurrentlyStudyingLessons] = useState<LessonItem[]>([
+    { id: 'curr-1', subject: 'Data Structures & Algorithms', topic: 'Binary Search Trees & AVL Rotations' },
+    { id: 'curr-2', subject: 'Database Management Systems', topic: 'Normalization (3NF, BCNF) & ACID Transactions' },
+    { id: 'curr-3', subject: 'Computer Networks', topic: 'Transport Layer & TCP Flow Control' },
+  ]);
+  const [dailyPlan, setDailyPlan] = useState<DailyPlanData | null>(null);
+  const [targetStudyHours, setTargetStudyHours] = useState<number>(4);
+  const [scheduleWindow, setScheduleWindow] = useState<'Full Day' | 'Morning' | 'Afternoon' | 'Evening'>('Full Day');
+  const [studyIntensity, setStudyIntensity] = useState<'Light Review' | 'Balanced' | 'Intensive'>('Balanced');
+  const [studentMood, setStudentMood] = useState<string>('Okay');
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState<boolean>(false);
+  const [planError, setPlanError] = useState<string | null>(null);
+  const [customFocus, setCustomFocus] = useState<string>('');
+  const [plannerTab, setPlannerTab] = useState<'schedule' | 'lessons'>('schedule');
+  const [isSavingPlan, setIsSavingPlan] = useState<boolean>(false);
+  const [planSavedMessage, setPlanSavedMessage] = useState<string | null>(null);
+
+  // Add lesson form states
+  const [newCompletedSubject, setNewCompletedSubject] = useState<string>('');
+  const [newCompletedTopic, setNewCompletedTopic] = useState<string>('');
+  const [newCurrentSubject, setNewCurrentSubject] = useState<string>('');
+  const [newCurrentTopic, setNewCurrentTopic] = useState<string>('');
+
+  // Add custom block modal state
+  const [customBlockTopic, setCustomBlockTopic] = useState<string>('');
+  const [customBlockSubject, setCustomBlockSubject] = useState<string>('');
+  const [customBlockTime, setCustomBlockTime] = useState<string>('');
+  const [showAddBlockModal, setShowAddBlockModal] = useState<boolean>(false);
+
   // PDF Summarizer state
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfPastedText, setPdfPastedText] = useState('');
@@ -104,6 +182,12 @@ export default function AcademicPage() {
   const [copiedSummary, setCopiedSummary] = useState(false);
 
   useEffect(() => {
+    // Check local storage for mood
+    if (typeof window !== 'undefined') {
+      const localMood = localStorage.getItem('student_latest_mood');
+      if (localMood) setStudentMood(localMood);
+    }
+
     fetch('/api/auth/me')
       .then(res => res.ok ? res.json() : null)
       .then(data => {
@@ -122,7 +206,22 @@ export default function AcademicPage() {
                 setHasDetails(true);
                 if (parsed.subjects[0]?.name) {
                   setQuizSubject(parsed.subjects[0].name);
+                  setNewCompletedSubject(parsed.subjects[0].name);
+                  setNewCurrentSubject(parsed.subjects[0].name);
                 }
+              }
+
+              if (parsed.completedLessons && Array.isArray(parsed.completedLessons) && parsed.completedLessons.length > 0) {
+                setCompletedLessons(parsed.completedLessons);
+              }
+              if (parsed.currentlyStudyingLessons && Array.isArray(parsed.currentlyStudyingLessons) && parsed.currentlyStudyingLessons.length > 0) {
+                setCurrentlyStudyingLessons(parsed.currentlyStudyingLessons);
+              }
+              if (parsed.dailyPlan) {
+                setDailyPlan(parsed.dailyPlan);
+              }
+              if (parsed.wellnessData?.latestMood?.mood) {
+                setStudentMood(parsed.wellnessData.latestMood.mood);
               }
             } catch (e) {
               console.error("Failed to parse academicDetails", e);
@@ -141,6 +240,14 @@ export default function AcademicPage() {
                 { name: 'Chemistry Practical Lab', totalExperiments: 8, completed: 8, internalScore: 94 },
               ]);
               setQuizSubject('Physics / Science');
+              setCompletedLessons([
+                { id: 'comp-1', subject: 'Mathematics', topic: 'Linear Equations & Polynomials' },
+                { id: 'comp-2', subject: 'Physics / Science', topic: 'Laws of Motion & Work Energy' },
+              ]);
+              setCurrentlyStudyingLessons([
+                { id: 'curr-1', subject: 'Mathematics', topic: 'Quadratic Equations & Trigonometry' },
+                { id: 'curr-2', subject: 'Physics / Science', topic: 'Gravitation & Fluid Mechanics' },
+              ]);
             } else {
               setQuizSubject('Data Structures & Algorithms');
             }
@@ -202,6 +309,215 @@ export default function AcademicPage() {
 
   const toggleTask = (id: number) => {
     setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+  };
+
+  // Daily Study Planner Handlers
+  const savePlanToProfile = async (
+    planToSave?: DailyPlanData | null,
+    completedToSave?: LessonItem[],
+    currentToSave?: LessonItem[]
+  ) => {
+    setIsSavingPlan(true);
+    setPlanSavedMessage(null);
+
+    const payload: AcademicData = {
+      attendance,
+      subjects,
+      labs,
+      completedLessons: completedToSave || completedLessons,
+      currentlyStudyingLessons: currentToSave || currentlyStudyingLessons,
+      dailyPlan: planToSave !== undefined ? planToSave : dailyPlan,
+    };
+
+    try {
+      const res = await fetch('/api/auth/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ academicDetails: payload })
+      });
+
+      if (res.ok) {
+        setPlanSavedMessage('Daily plan & lessons saved!');
+        setTimeout(() => setPlanSavedMessage(null), 3500);
+      }
+    } catch (e) {
+      console.error('Failed to save study plan:', e);
+    } finally {
+      setIsSavingPlan(false);
+    }
+  };
+
+  const handleGenerateStudyPlan = async () => {
+    setIsGeneratingPlan(true);
+    setPlanError(null);
+
+    try {
+      const res = await fetch('/api/academic/study-planner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentName,
+          educationLevel: student?.educationLevel || 'College',
+          department: student?.department || 'Engineering',
+          subjects: subjects.map(s => s.name),
+          completedLessons,
+          currentlyStudyingLessons,
+          targetHours: targetStudyHours,
+          intensity: studyIntensity,
+          scheduleWindow,
+          studentMood,
+          customFocus
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to generate study plan');
+      }
+
+      if (data.blocks && Array.isArray(data.blocks)) {
+        setDailyPlan(data);
+        savePlanToProfile(data, completedLessons, currentlyStudyingLessons);
+      } else {
+        throw new Error('Unexpected response format from study planner AI');
+      }
+    } catch (err: any) {
+      console.error('Study planner generation error:', err);
+      setPlanError(err.message || 'Failed to generate study plan');
+    } finally {
+      setIsGeneratingPlan(false);
+    }
+  };
+
+  const togglePlanBlock = (blockId: string) => {
+    if (!dailyPlan) return;
+    const updatedBlocks = dailyPlan.blocks.map(b => 
+      b.id === blockId 
+        ? { ...b, status: (b.status === 'completed' ? 'pending' : 'completed') as 'pending' | 'completed' } 
+        : b
+    );
+    const updatedPlan = { ...dailyPlan, blocks: updatedBlocks };
+    setDailyPlan(updatedPlan);
+    savePlanToProfile(updatedPlan, completedLessons, currentlyStudyingLessons);
+  };
+
+  const handleAddCompletedLesson = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newCompletedTopic.trim()) return;
+    const sub = newCompletedSubject || (subjects[0]?.name || 'General');
+    const newLesson: LessonItem = {
+      id: `comp-${Date.now()}`,
+      subject: sub,
+      topic: newCompletedTopic.trim()
+    };
+    const updated = [...completedLessons, newLesson];
+    setCompletedLessons(updated);
+    setNewCompletedTopic('');
+    savePlanToProfile(dailyPlan, updated, currentlyStudyingLessons);
+  };
+
+  const handleRemoveCompletedLesson = (id: string) => {
+    const updated = completedLessons.filter(l => l.id !== id);
+    setCompletedLessons(updated);
+    savePlanToProfile(dailyPlan, updated, currentlyStudyingLessons);
+  };
+
+  const handleAddCurrentLesson = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!newCurrentTopic.trim()) return;
+    const sub = newCurrentSubject || (subjects[0]?.name || 'General');
+    const newLesson: LessonItem = {
+      id: `curr-${Date.now()}`,
+      subject: sub,
+      topic: newCurrentTopic.trim()
+    };
+    const updated = [...currentlyStudyingLessons, newLesson];
+    setCurrentlyStudyingLessons(updated);
+    setNewCurrentTopic('');
+    savePlanToProfile(dailyPlan, completedLessons, updated);
+  };
+
+  const handleRemoveCurrentLesson = (id: string) => {
+    const updated = currentlyStudyingLessons.filter(l => l.id !== id);
+    setCurrentlyStudyingLessons(updated);
+    savePlanToProfile(dailyPlan, completedLessons, updated);
+  };
+
+  const handleMoveLessonToCompleted = (lesson: LessonItem) => {
+    const updatedCurrent = currentlyStudyingLessons.filter(l => l.id !== lesson.id);
+    const updatedComp = [...completedLessons, { ...lesson, id: `comp-${Date.now()}` }];
+    setCurrentlyStudyingLessons(updatedCurrent);
+    setCompletedLessons(updatedComp);
+    savePlanToProfile(dailyPlan, updatedComp, updatedCurrent);
+  };
+
+  const handleAddCustomBlock = () => {
+    if (!customBlockTopic.trim()) return;
+    const newBlock: StudyPlanBlock = {
+      id: `block-custom-${Date.now()}`,
+      timeSlot: customBlockTime.trim() || 'Flexible Time',
+      subject: customBlockSubject || (subjects[0]?.name || 'General'),
+      lesson: customBlockTopic.trim(),
+      type: 'deep_study',
+      durationMinutes: 40,
+      goal: 'Complete assignment tasks and targeted problem solving',
+      priority: 'Medium',
+      status: 'pending'
+    };
+    const updatedPlan: DailyPlanData = dailyPlan 
+      ? { 
+          ...dailyPlan, 
+          totalMinutesPlanned: dailyPlan.totalMinutesPlanned + 40,
+          blocks: [...dailyPlan.blocks, newBlock] 
+        }
+      : {
+          dayGoal: 'Daily focus session',
+          motivationalQuote: 'Consistency is the DNA of mastery.',
+          pedagogicalTip: 'Break complex problems into smaller testable sub-units.',
+          totalMinutesPlanned: 40,
+          blocks: [newBlock]
+        };
+    setDailyPlan(updatedPlan);
+    setCustomBlockTopic('');
+    setCustomBlockTime('');
+    setShowAddBlockModal(false);
+    savePlanToProfile(updatedPlan, completedLessons, currentlyStudyingLessons);
+  };
+
+  const handlePrepopulateSyllabus = () => {
+    const isSchool = student?.educationLevel === 'School';
+    const newCompleted = isSchool ? [
+      { id: `comp-${Date.now()}-1`, subject: 'Mathematics', topic: 'Linear Equations & Polynomials' },
+      { id: `comp-${Date.now()}-2`, subject: 'Physics / Science', topic: 'Laws of Motion & Work Energy' },
+      { id: `comp-${Date.now()}-3`, subject: 'Chemistry', topic: 'Chemical Reactions & Equations' },
+    ] : [
+      { id: `comp-${Date.now()}-1`, subject: 'Data Structures & Algorithms', topic: 'Stacks, Queues & Linked Lists' },
+      { id: `comp-${Date.now()}-2`, subject: 'Database Management Systems', topic: 'Relational Model & SQL Queries' },
+      { id: `comp-${Date.now()}-3`, subject: 'Operating Systems', topic: 'Process Scheduling & Threads' },
+    ];
+    const newCurrent = isSchool ? [
+      { id: `curr-${Date.now()}-1`, subject: 'Mathematics', topic: 'Quadratic Equations & Trigonometry' },
+      { id: `curr-${Date.now()}-2`, subject: 'Physics / Science', topic: 'Gravitation & Fluid Mechanics' },
+      { id: `curr-${Date.now()}-3`, subject: 'English & Literature', topic: 'Analytical Essay Writing & Grammar' },
+    ] : [
+      { id: `curr-${Date.now()}-1`, subject: 'Data Structures & Algorithms', topic: 'Binary Search Trees & AVL Rotations' },
+      { id: `curr-${Date.now()}-2`, subject: 'Database Management Systems', topic: 'Normalization (3NF, BCNF) & Transactions' },
+      { id: `curr-${Date.now()}-3`, subject: 'Computer Networks', topic: 'Transport Layer & TCP Flow Control' },
+    ];
+    setCompletedLessons(newCompleted);
+    setCurrentlyStudyingLessons(newCurrent);
+    savePlanToProfile(dailyPlan, newCompleted, newCurrent);
+  };
+
+  const handleCopySchedule = () => {
+    if (!dailyPlan) return;
+    const text = `Daily Study Plan (${new Date().toLocaleDateString()}):\n` +
+      `Goal: ${dailyPlan.dayGoal}\n` +
+      `Tip: ${dailyPlan.pedagogicalTip}\n\n` +
+      dailyPlan.blocks.map(b => `[${b.status === 'completed' ? 'X' : ' '}] ${b.timeSlot} | ${b.subject}: ${b.lesson} (${b.durationMinutes}m)\n   Goal: ${b.goal}`).join('\n\n');
+    navigator.clipboard.writeText(text);
+    setPlanSavedMessage('Schedule copied to clipboard!');
+    setTimeout(() => setPlanSavedMessage(null), 3000);
   };
 
   // AI Quiz Generation via Groq API
@@ -931,28 +1247,664 @@ export default function AcademicPage() {
 
           {/* TAB 4: Study Planner */}
           {activeTab === 'planner' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 space-y-6">
-              <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                <Calendar className="text-indigo-600" />
-                Study & Assignment Planner for {studentName}
-              </h2>
+            <div className="space-y-6 animate-in fade-in duration-300">
               
-              <div className="space-y-3">
-                {tasks.map(task => (
-                  <div key={task.id} className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${task.completed ? 'bg-slate-50 border-slate-200' : 'bg-white border-slate-200 shadow-sm hover:border-indigo-300'}`}>
-                    <button 
-                      onClick={() => toggleTask(task.id)}
-                      className={`w-6 h-6 rounded-md border flex items-center justify-center transition-colors cursor-pointer ${task.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 text-transparent hover:border-indigo-500'}`}
-                    >
-                      <Check size={16} />
-                    </button>
-                    <div className="flex-1">
-                      <p className={`font-medium text-sm ${task.completed ? 'text-slate-400 line-through' : 'text-slate-900'}`}>{task.title}</p>
-                      <p className="text-xs text-slate-500">{task.time} • {task.priority} Priority</p>
+              {/* Header & Sub-nav */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100">
+                  <div>
+                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold mb-2">
+                      <Sparkles size={14} /> AI Cognitive Study Planner
                     </div>
+                    <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                      <Calendar className="text-indigo-600" />
+                      1-Day Study Planner for {studentName}
+                    </h2>
+                    <p className="text-slate-500 text-sm mt-1 max-w-2xl">
+                      Generates a tailored daily study plan balancing <strong className="text-slate-700">Deep Focus on Currently Studying lessons</strong> with <strong className="text-slate-700">Spaced Repetition of Completed lessons</strong> for peak retention.
+                    </p>
                   </div>
-                ))}
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    {studentMood && (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 text-rose-700 text-xs font-medium border border-rose-100">
+                        <HeartPulse size={14} /> Mood Sync: <strong className="capitalize">{studentMood}</strong>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => handleCopySchedule()}
+                      disabled={!dailyPlan}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      <Copy size={14} /> Copy Schedule
+                    </button>
+                    <button
+                      onClick={() => savePlanToProfile()}
+                      disabled={isSavingPlan}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl bg-slate-900 text-white hover:bg-slate-800 transition-colors disabled:opacity-60 cursor-pointer"
+                    >
+                      {isSavingPlan ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                      Save Plan & Progress
+                    </button>
+                  </div>
+                </div>
+
+                {planSavedMessage && (
+                  <div className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
+                    <CheckCircle2 size={16} className="text-emerald-600" /> {planSavedMessage}
+                  </div>
+                )}
+
+                {/* Subtab Navigation */}
+                <div className="flex items-center gap-3 pt-6">
+                  <button
+                    onClick={() => setPlannerTab('schedule')}
+                    className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+                      plannerTab === 'schedule'
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    <ListTodo size={16} />
+                    Today's Schedule & Sessions
+                    {dailyPlan && (
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                        plannerTab === 'schedule' ? 'bg-indigo-500 text-white' : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {dailyPlan.blocks.filter(b => b.status === 'completed').length}/{dailyPlan.blocks.length}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setPlannerTab('lessons')}
+                    className={`px-4 py-2 text-sm font-semibold rounded-xl transition-all cursor-pointer flex items-center gap-2 ${
+                      plannerTab === 'lessons'
+                        ? 'bg-indigo-600 text-white shadow-sm'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    <BookMarked size={16} />
+                    Manage Lessons ({currentlyStudyingLessons.length} Current • {completedLessons.length} Completed)
+                  </button>
+                </div>
               </div>
+
+              {/* TAB 4.1: DAILY SCHEDULE VIEW */}
+              {plannerTab === 'schedule' && (
+                <div className="space-y-6">
+                  
+                  {/* Generation Controls Card */}
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                        <Zap size={16} className="text-amber-500" />
+                        Plan Parameters For Today
+                      </h3>
+                      <span className="text-xs text-slate-500 font-medium">
+                        {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {/* Target Hours */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Study Duration Today</label>
+                        <select
+                          value={targetStudyHours}
+                          onChange={(e) => setTargetStudyHours(Number(e.target.value))}
+                          disabled={isGeneratingPlan}
+                          className="w-full p-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        >
+                          <option value={2}>2 Hours (Light Focus)</option>
+                          <option value={3}>3 Hours (Standard Session)</option>
+                          <option value={4}>4 Hours (Recommended)</option>
+                          <option value={5}>5 Hours (Intensive)</option>
+                          <option value={6}>6 Hours (Exam Mode)</option>
+                          <option value={8}>8 Hours (Marathon Sprint)</option>
+                        </select>
+                      </div>
+
+                      {/* Time Window */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Schedule Window</label>
+                        <select
+                          value={scheduleWindow}
+                          onChange={(e: any) => setScheduleWindow(e.target.value)}
+                          disabled={isGeneratingPlan}
+                          className="w-full p-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        >
+                          <option value="Full Day">Full Day (Distributed with breaks)</option>
+                          <option value="Morning">Morning (8:00 AM - 1:00 PM)</option>
+                          <option value="Afternoon">Afternoon (1:00 PM - 6:00 PM)</option>
+                          <option value="Evening">Evening (6:00 PM - 11:00 PM)</option>
+                        </select>
+                      </div>
+
+                      {/* Intensity */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Focus Intensity</label>
+                        <select
+                          value={studyIntensity}
+                          onChange={(e: any) => setStudyIntensity(e.target.value)}
+                          disabled={isGeneratingPlan}
+                          className="w-full p-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        >
+                          <option value="Balanced">Balanced (Theory + Problems + Spaced Review)</option>
+                          <option value="Light Review">Light Review (Gentle Pacing & Short Blocks)</option>
+                          <option value="Intensive">Intensive (Deep Problem Solving & Recall)</option>
+                        </select>
+                      </div>
+
+                      {/* Special Focus / Note */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Specific Focus / Exam (Optional)</label>
+                        <input
+                          type="text"
+                          value={customFocus}
+                          onChange={(e) => setCustomFocus(e.target.value)}
+                          placeholder="e.g. Midterm prep, Trees code"
+                          disabled={isGeneratingPlan}
+                          className="w-full p-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-2">
+                      <div className="text-xs text-slate-500 flex items-center gap-2">
+                        <span>Includes:</span>
+                        <span className="inline-flex items-center gap-1 font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                          {currentlyStudyingLessons.length} Active Lessons
+                        </span>
+                        <span>•</span>
+                        <span className="inline-flex items-center gap-1 font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md">
+                          {completedLessons.length} Revision Lessons
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={handleGenerateStudyPlan}
+                        disabled={isGeneratingPlan}
+                        className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm transition-all disabled:opacity-60 cursor-pointer"
+                      >
+                        {isGeneratingPlan ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Synthesizing Daily Cognitive Schedule...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={16} />
+                            Generate AI 1-Day Study Plan
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {planError && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
+                        <AlertCircle size={15} /> {planError}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Generated Daily Plan Display */}
+                  {dailyPlan ? (
+                    <div className="space-y-6">
+                      
+                      {/* Daily Motivation & Pedagogy Card */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-5 rounded-2xl border border-indigo-100 flex flex-col justify-between">
+                          <div>
+                            <span className="text-xs font-bold uppercase tracking-wider text-indigo-700 flex items-center gap-1.5 mb-1.5">
+                              <Target size={14} /> Today's Core Mission
+                            </span>
+                            <p className="text-sm font-semibold text-slate-800 leading-snug">{dailyPlan.dayGoal}</p>
+                          </div>
+                          <div className="mt-4 flex items-center gap-2 text-xs text-indigo-700 font-medium">
+                            <Clock size={13} /> {dailyPlan.totalMinutesPlanned} Minutes Total Planned
+                          </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-5 rounded-2xl border border-amber-100 flex flex-col justify-between">
+                          <div>
+                            <span className="text-xs font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1.5 mb-1.5">
+                              <Brain size={14} /> Cognitive Technique
+                            </span>
+                            <p className="text-xs text-slate-700 leading-relaxed">{dailyPlan.pedagogicalTip}</p>
+                          </div>
+                          <div className="mt-4 text-xs font-semibold text-amber-800">
+                            Spaced Interleaving Model
+                          </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-5 rounded-2xl border border-emerald-100 flex flex-col justify-between">
+                          <div>
+                            <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5 mb-1.5">
+                              <Flame size={14} /> Daily Motivation
+                            </span>
+                            <p className="text-xs italic text-slate-700 leading-relaxed font-medium">"{dailyPlan.motivationalQuote}"</p>
+                          </div>
+                          <div className="mt-4 flex items-center justify-between text-xs text-emerald-800 font-semibold">
+                            <span>Today's Progress</span>
+                            <span>
+                              {Math.round((dailyPlan.blocks.filter(b => b.status === 'completed').length / Math.max(1, dailyPlan.blocks.length)) * 100)}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Progress Bar Strip */}
+                      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="space-y-1.5 flex-1">
+                          <div className="flex justify-between text-xs font-semibold text-slate-700">
+                            <span>Schedule Completion</span>
+                            <span>
+                              {dailyPlan.blocks.filter(b => b.status === 'completed').length} of {dailyPlan.blocks.length} Sessions Completed
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                            <div 
+                              className="bg-indigo-600 h-3 rounded-full transition-all duration-500 ease-out"
+                              style={{
+                                width: `${Math.round((dailyPlan.blocks.filter(b => b.status === 'completed').length / Math.max(1, dailyPlan.blocks.length)) * 100)}%`
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => setShowAddBlockModal(true)}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3.5 py-2.5 rounded-xl transition-colors cursor-pointer shrink-0"
+                        >
+                          <Plus size={14} /> Add Custom Task / Session
+                        </button>
+                      </div>
+
+                      {/* Schedule Timeline Blocks */}
+                      <div className="space-y-3">
+                        {dailyPlan.blocks.map((block, idx) => {
+                          const isCompleted = block.status === 'completed';
+                          const isBreak = block.type === 'break';
+                          const isRevision = block.type === 'spaced_repetition';
+                          const isPractice = block.type === 'practice_problems';
+
+                          return (
+                            <div 
+                              key={block.id || idx}
+                              className={`p-5 rounded-2xl border transition-all ${
+                                isCompleted 
+                                  ? 'bg-slate-50 border-slate-200 opacity-80' 
+                                  : isBreak
+                                    ? 'bg-emerald-50/40 border-emerald-200 hover:border-emerald-300'
+                                    : isRevision
+                                      ? 'bg-amber-50/30 border-amber-200 hover:border-amber-300 shadow-sm'
+                                      : 'bg-white border-slate-200 hover:border-indigo-300 shadow-sm'
+                              }`}
+                            >
+                              <div className="flex items-start gap-4">
+                                <button
+                                  onClick={() => togglePlanBlock(block.id)}
+                                  className={`w-7 h-7 rounded-xl border flex items-center justify-center transition-colors cursor-pointer shrink-0 mt-0.5 ${
+                                    isCompleted 
+                                      ? 'bg-emerald-500 border-emerald-500 text-white' 
+                                      : 'border-slate-300 text-transparent hover:border-indigo-500 bg-white'
+                                  }`}
+                                >
+                                  <Check size={16} />
+                                </button>
+
+                                <div className="flex-1 space-y-1.5">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="text-xs font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg">
+                                        {block.timeSlot}
+                                      </span>
+
+                                      {isBreak ? (
+                                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-100/70 px-2.5 py-0.5 rounded-full">
+                                          <Coffee size={12} /> Rest & Hydrate
+                                        </span>
+                                      ) : isRevision ? (
+                                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-full">
+                                          <RotateCcw size={12} /> Spaced Recall (Completed Lesson)
+                                        </span>
+                                      ) : isPractice ? (
+                                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-full">
+                                          <CheckSquare size={12} /> Practice Problems (Current Lesson)
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 bg-indigo-100 px-2.5 py-0.5 rounded-full">
+                                          <Brain size={12} /> Deep Focus (Currently Studying)
+                                        </span>
+                                      )}
+
+                                      <span className="text-xs text-slate-500 font-medium">
+                                        {block.durationMinutes} min
+                                      </span>
+                                    </div>
+
+                                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
+                                      block.priority === 'High' ? 'text-rose-700 bg-rose-50' : 'text-slate-600 bg-slate-100'
+                                    }`}>
+                                      {block.priority} Priority
+                                    </span>
+                                  </div>
+
+                                  <div>
+                                    <h4 className={`text-base font-bold ${isCompleted ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
+                                      {block.subject} — {block.lesson}
+                                    </h4>
+                                    <p className={`text-xs mt-1 leading-relaxed ${isCompleted ? 'text-slate-400' : 'text-slate-600'}`}>
+                                      {block.goal}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    /* Initial Empty State */
+                    <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-4">
+                      <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto">
+                        <Calendar size={32} />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900">No Study Plan Generated for Today Yet</h3>
+                      <p className="text-slate-500 text-sm max-w-md mx-auto">
+                        Click the button above to generate a smart 1-day study plan customized with your active and completed lessons.
+                      </p>
+                      <button
+                        onClick={handleGenerateStudyPlan}
+                        disabled={isGeneratingPlan}
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-sm transition-all cursor-pointer"
+                      >
+                        {isGeneratingPlan ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                        Generate Today's Study Plan
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Add Custom Block Modal */}
+                  {showAddBlockModal && (
+                    <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4 backdrop-blur-xs">
+                      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-200">
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                            <Plus size={16} className="text-indigo-600" />
+                            Add Custom Study Task / Session
+                          </h3>
+                          <button 
+                            onClick={() => setShowAddBlockModal(false)}
+                            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                          >
+                            <X size={18} />
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">Subject</label>
+                            <select
+                              value={customBlockSubject || (subjects[0]?.name || '')}
+                              onChange={(e) => setCustomBlockSubject(e.target.value)}
+                              className="w-full p-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50"
+                            >
+                              {subjects.map((sub, i) => (
+                                <option key={i} value={sub.name}>{sub.name}</option>
+                              ))}
+                              <option value="General & Lab">General / Lab / Assignment</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">Task or Topic Name</label>
+                            <input
+                              type="text"
+                              value={customBlockTopic}
+                              onChange={(e) => setCustomBlockTopic(e.target.value)}
+                              placeholder="e.g. Finish Operating Systems Lab Record Exp 8"
+                              className="w-full p-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">Time Slot (Optional)</label>
+                            <input
+                              type="text"
+                              value={customBlockTime}
+                              onChange={(e) => setCustomBlockTime(e.target.value)}
+                              placeholder="e.g. 04:30 PM - 05:15 PM"
+                              className="w-full p-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end gap-3 pt-3">
+                          <button
+                            onClick={() => setShowAddBlockModal(false)}
+                            className="px-4 py-2 text-xs font-semibold rounded-xl text-slate-600 hover:bg-slate-100"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={handleAddCustomBlock}
+                            disabled={!customBlockTopic.trim()}
+                            className="px-5 py-2 text-xs font-semibold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 cursor-pointer"
+                          >
+                            Add To Schedule
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 4.2: CURRICULUM TRACKER (CURRENTLY STUDYING vs COMPLETED) */}
+              {plannerTab === 'lessons' && (
+                <div className="space-y-6">
+                  
+                  {/* Top helper banner */}
+                  <div className="bg-gradient-to-r from-indigo-50 via-white to-amber-50 p-6 rounded-2xl border border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">Syllabus & Lesson Progress Management</h3>
+                      <p className="text-xs text-slate-600 mt-1 max-w-xl">
+                        Keep track of what lessons you are currently mastering vs what you have finished. The AI study planner uses this exact breakdown to schedule your day!
+                      </p>
+                    </div>
+                    <button
+                      onClick={handlePrepopulateSyllabus}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-white border border-slate-200 text-indigo-600 hover:bg-indigo-50 transition-colors shrink-0 shadow-xs cursor-pointer"
+                    >
+                      <RotateCcw size={13} /> Reset Standard Syllabus Topics
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    {/* COLUMN 1: Currently Studying Lessons */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-indigo-100 p-6 space-y-5">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-xs">
+                            <Brain size={18} />
+                          </div>
+                          <div>
+                            <h4 className="text-base font-bold text-slate-900">Currently Studying Lessons</h4>
+                            <p className="text-xs text-slate-500">Active chapters receiving deep focus blocks</p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          {currentlyStudyingLessons.length} Active
+                        </span>
+                      </div>
+
+                      {/* Add Currently Studying Form */}
+                      <form onSubmit={handleAddCurrentLesson} className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                        <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          + Add Currently Studying Topic
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="sm:col-span-1">
+                            <select
+                              value={newCurrentSubject || (subjects[0]?.name || '')}
+                              onChange={(e) => setNewCurrentSubject(e.target.value)}
+                              className="w-full p-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-800"
+                            >
+                              {subjects.map((s, idx) => (
+                                <option key={idx} value={s.name}>{s.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <input
+                              type="text"
+                              value={newCurrentTopic}
+                              onChange={(e) => setNewCurrentTopic(e.target.value)}
+                              placeholder="e.g. Binary Search Trees & AVL Rotations"
+                              className="w-full p-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-800"
+                            />
+                          </div>
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={!newCurrentTopic.trim()}
+                          className="w-full py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          <Plus size={14} /> Add To Currently Studying
+                        </button>
+                      </form>
+
+                      {/* List of currently studying */}
+                      <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                        {currentlyStudyingLessons.map((lesson) => (
+                          <div
+                            key={lesson.id}
+                            className="p-3.5 rounded-xl border border-indigo-100 bg-indigo-50/30 flex items-center justify-between gap-3 hover:border-indigo-300 transition-all"
+                          >
+                            <div className="space-y-0.5 flex-1 min-w-0">
+                              <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block truncate">
+                                {lesson.subject}
+                              </span>
+                              <p className="text-sm font-semibold text-slate-900 truncate">
+                                {lesson.topic}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                onClick={() => handleMoveLessonToCompleted(lesson)}
+                                title="Mark completed and move to revision list"
+                                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors flex items-center gap-1 cursor-pointer"
+                              >
+                                <Check size={12} /> Finished
+                              </button>
+                              <button
+                                onClick={() => handleRemoveCurrentLesson(lesson.id)}
+                                title="Remove lesson"
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* COLUMN 2: Completed Lessons */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-amber-100 p-6 space-y-5">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs">
+                            <CheckCircle2 size={18} />
+                          </div>
+                          <div>
+                            <h4 className="text-base font-bold text-slate-900">Completed Lessons</h4>
+                            <p className="text-xs text-slate-500">Mastered chapters receiving active recall revision</p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                          {completedLessons.length} Completed
+                        </span>
+                      </div>
+
+                      {/* Add Completed Form */}
+                      <form onSubmit={handleAddCompletedLesson} className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                        <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          + Add Completed / Mastered Topic
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <div className="sm:col-span-1">
+                            <select
+                              value={newCompletedSubject || (subjects[0]?.name || '')}
+                              onChange={(e) => setNewCompletedSubject(e.target.value)}
+                              className="w-full p-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-800"
+                            >
+                              {subjects.map((s, idx) => (
+                                <option key={idx} value={s.name}>{s.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="sm:col-span-2">
+                            <input
+                              type="text"
+                              value={newCompletedTopic}
+                              onChange={(e) => setNewCompletedTopic(e.target.value)}
+                              placeholder="e.g. Stacks, Queues & Linked Lists"
+                              className="w-full p-2 text-xs rounded-lg border border-slate-200 bg-white text-slate-800"
+                            />
+                          </div>
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={!newCompletedTopic.trim()}
+                          className="w-full py-2 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          <Plus size={14} /> Add To Completed
+                        </button>
+                      </form>
+
+                      {/* List of completed */}
+                      <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+                        {completedLessons.map((lesson) => (
+                          <div
+                            key={lesson.id}
+                            className="p-3.5 rounded-xl border border-amber-100 bg-amber-50/20 flex items-center justify-between gap-3 hover:border-amber-300 transition-all"
+                          >
+                            <div className="space-y-0.5 flex-1 min-w-0">
+                              <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block truncate">
+                                {lesson.subject}
+                              </span>
+                              <p className="text-sm font-semibold text-slate-800 truncate">
+                                {lesson.topic}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                                <CheckCircle2 size={11} /> Mastered
+                              </span>
+                              <button
+                                onClick={() => handleRemoveCompletedLesson(lesson.id)}
+                                title="Remove lesson"
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              )}
+
             </div>
           )}
 
