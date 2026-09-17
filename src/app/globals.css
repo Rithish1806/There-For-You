@@ -1,6 +1,26 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #F8FAFC;
+  --surface: #FFFFFF;
+  --surface-hover: #F1F5F9;
+  --border: #E2E8F0;
+  --text-main: #0F172A;
+  --text-muted: #64748B;
+}
+
+.dark {
+  --background: #0B0F19;
+  --surface: #111827;
+  --surface-hover: #1E293B;
+  --border: #1F2937;
+  --text-main: #F8FAFC;
+  --text-muted: #94A3B8;
+}
+
 @theme {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
@@ -12,11 +32,11 @@
   --color-secondary: #0EA5E9; /* Sky 500 */
   --color-accent: #10B981; /* Emerald 500 */
   
-  --color-background: #F8FAFC; /* Slate 50 */
-  --color-surface: #FFFFFF;
+  --color-background: var(--background);
+  --color-surface: var(--surface);
   
-  --color-text-main: #0F172A; /* Slate 900 */
-  --color-text-muted: #64748B; /* Slate 500 */
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
 }
 
 @layer base {
@@ -26,6 +46,7 @@
     font-family: var(--font-sans), system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.25s ease, color 0.25s ease;
   }
 }
 
@@ -36,11 +57,22 @@
     border: 1px solid rgba(255, 255, 255, 0.5);
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
   }
+
+  .dark .glass-card {
+    background: rgba(17, 24, 39, 0.75);
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  }
   
   .glass-panel {
     background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.6);
+  }
+
+  .dark .glass-panel {
+    background: rgba(17, 24, 39, 0.85);
+    border-color: rgba(255, 255, 255, 0.1);
   }
 
   /* Micro-interactions & animations */
@@ -137,6 +169,17 @@
   animation: rippleWave 3s ease-in-out infinite;
 }
 
+/* HTML & Body Global Overflow Containment */
+html {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 /* =========================================================
    CRYSTAL-CLEAR CODE BLOCK & INLINE CODE STYLES
    Fixes illegible light-text-on-white-background bug in markdown
@@ -180,7 +223,7 @@
   content: "" !important;
 }
 
-/* Inline code (e.g. `npm install` or variable names not in a pre block) */
+/* Inline code (Light Mode) */
 .prose :not(pre) > code {
   background-color: #f1f5f9 !important; /* Soft slate-100 */
   color: #4338ca !important; /* Vibrant deep indigo-700 */
@@ -190,6 +233,73 @@
   font-size: 0.85em !important;
   font-weight: 600 !important;
   font-family: var(--font-mono, monospace) !important;
+}
+
+/* Inline code (Dark Mode) - high contrast */
+.dark .prose :not(pre) > code {
+  background-color: #1e293b !important;
+  color: #a5b4fc !important;
+  border: 1px solid #334155 !important;
+}
+
+/* Prose High Visibility & Contrast in Dark Mode */
+.dark .prose {
+  color: #f8fafc !important;
+}
+
+.dark .prose p,
+.dark .prose li,
+.dark .prose span {
+  color: #f1f5f9 !important;
+}
+
+.dark .prose strong,
+.dark .prose b {
+  color: #ffffff !important;
+}
+
+.dark .prose h1,
+.dark .prose h2,
+.dark .prose h3,
+.dark .prose h4 {
+  color: #ffffff !important;
+}
+
+.dark .prose table {
+  border-color: #334155 !important;
+}
+
+.dark .prose th {
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+  border-color: #334155 !important;
+}
+
+.dark .prose td {
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Slim, clean scrollbars preventing layout shift */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.4);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.7);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
 }
 
 
